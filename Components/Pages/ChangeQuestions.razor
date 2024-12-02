@@ -1,0 +1,115 @@
+﻿@page "/ChangeQuestions"
+@using Quiz.Components.DataAccessLayer.Repository
+@using Quiz.Components.Models
+@inject HttpClient _httpClient
+@rendermode InteractiveServer
+
+<h1>Change Questions</h1>
+
+<table width="1405">
+	<thead>
+		<tr>
+			<th width="5"></th>
+			<th width="300">Question Text</th>
+			<th width="200">Answer One</th>
+			<th width="200">Answer Two</th>
+			<th width="200">Answer Three</th>
+			<th width="200">Answer Four</th>
+			<th width="100">Seconds</th>
+			<th width="200">Correct Answer</th>
+		</tr>
+	</thead>
+	<tbody>
+		@foreach (var question in questions)
+		{
+			<tr>
+				<td><input type="checkbox" @bind="question.IsSelected" /></td>
+				<td>@question.QuestionText</td>
+				<td>@question.AnswerOne</td>
+				<td>@question.AnswerTwo</td>
+				<td>@question.AnswerThree</td>
+				<td>@question.AnswerFour</td>
+				<td>@question.Seconds</td>
+				<td>@question.CorrectAnswer</td>
+			</tr>
+		}
+	</tbody>
+</table>
+
+<button @onclick="DeleteSelectedQuestions">Slet valgte spørgsmål</button>
+
+<h1>Add new question</h1>
+<EditForm Model="@this" OnValidSubmit="SaveQuestion">
+	<table>
+		<thead>
+			<tr>
+				<th width="300">Question Text</th>
+				<th width="200">Answer One</th>
+				<th width="200">Answer Two</th>
+				<th width="200">Answer Three</th>
+				<th width="200">Answer Four</th>
+				<th width="100">Seconds</th>
+				<th width="200">Correct Answer</th>
+			</tr>
+		</thead>
+		<tbody>
+			<tr>
+				<td><input type="text" placeholder=" Enter question text" @bind-value="newQuestion.QuestionText" required /></td>
+				<td><input type="text" placeholder=" Enter answer one" @bind-value="newQuestion.AnswerOne" required /></td>
+				<td><input type="text" placeholder=" Enter answer two" @bind-value="newQuestion.AnswerTwo" required /></td>
+				<td><input type="text" placeholder=" Enter answer three" @bind-value="newQuestion.AnswerThree" /></td>
+				<td><input type="text" placeholder=" Enter answer four" @bind-value="newQuestion.AnswerFour" /></td>
+				<td><input type="text" placeholder=" Enter seconds" @bind-value="newQuestion.Seconds" /></td>
+				<td><input type="text" placeholder=" Enter correct answer" @bind-value="newQuestion.CorrectAnswer" required /></td>
+			</tr>
+		</tbody>
+	</table>
+
+	<button type="submit">Add question</button>
+
+</EditForm>
+
+@code {
+	private Question newQuestion = new Question();
+	private List<Question> questions = new List<Question>();
+
+	protected override async Task OnInitializedAsync()
+	{
+		await LoadQuestions();
+	}
+
+	private async Task LoadQuestions()
+	{
+		var url = "https://localhost:7230/api/QuizMain/GetQuestions"; // Tilpas URL'en til dit API
+		var response = await _httpClient.GetFromJsonAsync<List<Question>>(url);
+
+		questions = response;
+	}
+
+	private async Task SaveQuestion()
+	{
+		var url = $"https://localhost:7230/api/QuizMain/SaveQuestion";
+		var response = await _httpClient.PostAsJsonAsync(url, newQuestion);
+
+		await LoadQuestions();
+
+		newQuestion = new Question();
+		StateHasChanged();
+	}
+
+	private async Task DeleteSelectedQuestions()
+	{
+		var url = $"https://localhost:7230/api/QuizMain/DeleteQuestion";
+		var selectedQuestions = questions.Where(question => question.IsSelected).ToList(); // Find de valgte spørgsmål
+
+		if (selectedQuestions.Any())
+		{
+			var response = await _httpClient.PostAsJsonAsync(url, selectedQuestions); //sender elementer til API
+
+			questions = questions.Where(question => !question.IsSelected).ToList();
+
+			// Opdater UI
+			StateHasChanged();
+		}
+	}
+}

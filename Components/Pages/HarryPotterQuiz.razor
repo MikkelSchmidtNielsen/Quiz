@@ -1,0 +1,160 @@
+﻿@page "/HarryPotterQuiz"
+@using Quiz.Components.Controllers
+@using Quiz.Components.Models
+@using Newtonsoft.Json;
+@inject HttpClient _httpClient
+@inject IJSRuntime JS
+@rendermode InteractiveServer
+
+<PageTitle>Home</PageTitle>
+
+@if (!showCounter && !showQuiz)
+{
+	<div class="magical-button">
+		<button class="harry-potter-start-text" @onclick="startCounter">
+			<span class="magical-text" style="--i:1">S</span>
+			<span class="magical-text" style="--i:2">t</span>
+			<span class="magical-text" style="--i:3">a</span>
+			<span class="magical-text" style="--i:4">r</span>
+			<span class="magical-text" style="--i:5">t</span>
+			<span class="magical-text" style="--i:6; margin-left: 30px;">Q</span>
+			<span class="magical-text" style="--i:7">u</span>
+			<span class="magical-text" style="--i:8">i</span>
+			<span class="magical-text" style="--i:9">z</span>
+		</button>
+	</div>
+}
+
+@if (showCounter)
+{
+	<div class="centerbutton quiz-wrapper" style="min-height: 0; margin-top: 20%;">
+		<span class="answer-text spin-animation">@countdownToQuiz</span>
+	</div>
+	<div class="centerbutton quiz-wrapper" style="min-height: 0;">
+		<span class="answer-text" style="margin: 10px;">@countdownText</span>
+	</div>
+}
+
+@if (showQuiz)
+{
+	<div class="quiz-wrapper">
+		<div class="question-box">@QuestionText</div>
+	</div>
+
+	<div class="quiz-wrapper">
+		<div class="tinLeftIn quiz-card red answer-text" style="@showAnswer" @onclick="() => SendToServer(1)">@firstAnswerText</div>
+
+		<div class="tinRightIn quiz-card yellow answer-text" style="@showAnswer" @onclick="() => SendToServer(2)">@secondAnswerText</div>
+	</div>
+
+	<div class="quiz-wrapper">
+		<div class="tinLeftIn quiz-card blue answer-text" style="@showAnswer" @onclick="() => SendToServer(3)">@thirdAnswerText</div>
+
+		<div class="tinRightIn quiz-card green answer-text" style="@showAnswer" @onclick="() => SendToServer(4)">@fourthAnswerText</div>
+	</div>
+
+	<div class="quiz-wrapper">
+		<span class="answer-text">You got: @points points</span>
+	</div>
+
+	<div class="quiz-wrapper">
+		<span class="answer-text">Seconds left: @seconds</span>
+	</div>
+
+	<div class="timer-bar" style="@barShrink"></div>
+}
+
+
+@code {
+	private string QuestionText = "";
+	private string firstAnswerText = "";
+	private string secondAnswerText = "";
+	private string thirdAnswerText = "";
+	private string fourthAnswerText = "";
+	private decimal points = 0;
+	private int seconds = 0;
+	private string showAnswer = "";
+	private int countdownToQuiz = 3;
+	private string countdownText = "Get ready!";
+	private int timerWidth = 100;
+	private string barShrink = "width: 100%; transition: none";
+	private bool showQuiz = false;
+	private bool showCounter = false;
+
+	protected override async void OnInitialized()
+	{
+		SendToServer(0);
+	}
+
+	private async void startCounter()
+	{
+		showCounter = true;
+		await JS.InvokeVoidAsync("playMusic", "audio/HarryPotterQuiz/QuizBackgroundMusic.mp3");
+
+		await Task.Delay(1000);
+		countdownToQuiz--;
+		countdownText = "Set!";
+		StateHasChanged();
+
+		await Task.Delay(1000);
+		countdownToQuiz--;
+		countdownText = "Go!";
+		StateHasChanged();
+
+		showCounter = false;
+		showQuiz = true;
+
+		Countdown();
+		await Task.Delay(500);
+		await JS.InvokeVoidAsync("playMusic", "audio/HarryPotterQuiz/FirstQuestionSound.mp3");
+	}
+
+	private void ResetCountdown()
+	{
+		barShrink = "width: 100%; transition: none";
+	}
+
+	private async Task Countdown()
+	{
+		while (seconds > 0)
+		{
+			await Task.Delay(1000);
+			barShrink = "width: 0%; transition: width linear " + (seconds - 1) + "s;";
+			seconds--;
+			StateHasChanged();
+		}
+	}
+
+	private void ShowOrHideAnswer(string answer)
+	{
+		if (string.IsNullOrEmpty(answer))
+		{
+			showAnswer = "opacity: 0";
+		}
+		else
+		{
+			showAnswer = "opacity: 1";
+		}
+	}
+
+	private async Task SendToServer(int id)
+	{
+		var url = $"https://localhost:7230/api/QuizMain/{id}";  // Erstat med din faktiske port
+		var response = await _httpClient.GetStringAsync(url);
+
+		var data = JsonConvert.DeserializeObject<ReturnPointAndQuestion>(response);
+		points = data.Points;
+
+		QuestionText = data.Question.QuestionText;
+		ShowOrHideAnswer(firstAnswerText = data.Question.AnswerOne);
+		ShowOrHideAnswer(secondAnswerText = data.Question.AnswerTwo);
+		ShowOrHideAnswer(thirdAnswerText = data.Question.AnswerThree);
+		ShowOrHideAnswer(fourthAnswerText = data.Question.AnswerFour);
+		seconds = data.Question.Seconds;
+		if (showQuiz)
+		{
+			await JS.InvokeVoidAsync("playMusic", data.Question.SoundFile);
+		}
+		ResetCountdown();
+	}
+}
